@@ -1,4 +1,4 @@
-# myTeam.py
+15# myTeam.py
 # ---------
 # Licensing Information:  You are free to use or extend these projects for
 # educational purposes provided that (1) you do not distribute or publish
@@ -10,6 +10,11 @@
 # (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
 # Student side autograding was added by Brad Miller, Nick Hay, and
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
+
+
+# Artificial Intelligence - CS 4365 at UT Dallas
+# Nisarg Desai - npd160030
+# Sanketh Reddy
 
 
 from captureAgents import CaptureAgent

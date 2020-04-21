@@ -89,6 +89,7 @@ class ReflexCaptureAgent(CaptureAgent):
           bestDist = dist
       return bestAction
 
+    # print 'bestAction type :', type(bestActions[0])
     return random.choice(bestActions)
 
   def getSuccessor(self, gameState, action):
@@ -107,9 +108,13 @@ class ReflexCaptureAgent(CaptureAgent):
     """
     Computes a linear combination of features and feature weights
     """
+    # print 'team:', self.getTeam(gameState)
     features = self.getFeatures(gameState, action)
     weights = self.getWeights(gameState, action)
-    return features * weights
+    # print 'features:', features
+    # print 'weights:', weights
+    x = features * weights
+    return x
 
   def getFeatures(self, gameState, action):
     """

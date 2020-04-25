@@ -136,59 +136,82 @@ class ReflexAgent(CaptureAgent):
 
     startUtility = 0
     startFeatures = self.getFeatures(gameState)
-    startWeights = self.getWeights(gameState)
+    startWeights = self.getWeights(gameState, startFeatures)
     startState = SearchState(gameState, agentIndex, actions, startUtility, visitedPositions, startFeatures)
     queue.push((startState, 0))
 
+    print '------------------------------'
+
+    # depthCounter = 100
+    # while depthCounter >= 0 and not queue.isEmpty() and time.time() - startTime < 0.8:
     while not queue.isEmpty() and time.time() - startTime < 0.8:
       (searchState, utility) = queue.pop()
       nextActions = searchState.currentGameState.getLegalActions(self.index)
       if Directions.STOP in nextActions:
         nextActions.remove(Directions.STOP)
 
+      exploredActionTree = len(nextActions) == 1
 
-
-      print 'nextActions:', nextActions
+      # print 'nextActions:', nextActions, ' currentPosition:', gameState.getAgentPosition(self.index)
       for action in nextActions:
-        print 'checking action:', action
+        # print 'checking action:', action
         nextGameState = searchState.currentGameState.generateSuccessor(searchState.agentIndex, action)
         nextPosition = self.getPosition(nextGameState, self.index)
-
-        print 'nextPosition:', nextPosition, 'visited positions:', searchState.visitedPositions
-        if nextPosition in searchState.visitedPositions and len(nextActions) > 1:
+        nextFeatures = self.getFeatures(nextGameState)
+        
+        # print 'nextPosition:', nextPosition, 'visited positions:', searchState.visitedPositions
+        # if nextPosition in searchState.visitedPositions and not exploredActionTree:
+        if nextPosition in searchState.visitedPositions:
+        # if nextPosition in searchState.visitedPositions and exploredActionTree:
+          # print 'continuing:'
           continue
 
-        nextStateUtility = 0
+        # if nextFeatures['distanceToGhost'] <= len(nextActions) and len(nextActions) < 5 and nextGameState.getAgentState(self.index).isPacman:
+        #   continue
+
         if nextGameState not in visited:
           nextStateUtility = self.getUtility(nextGameState)
           visited[nextGameState] = nextStateUtility
         else:
           nextStateUtility = visited[nextGameState]
 
-        print 'utility with ', action, '=', nextStateUtility
+        # print 'utility with', action, '=', nextStateUtility
         totalUtilitySoFar = nextStateUtility + searchState.utilitySoFar
 
-        nextSearchStateActions = searchState.actionsSoFar
-        nextSearchStateActions.append(action)
-        nextVisitedPositions = searchState.visitedPositions
-        nextVisitedPositions.append(nextPosition)
-        
-        print 'nextSearchStateActions:', nextSearchStateActions
-        nextSearchState = SearchState(nextGameState, agentIndex, nextSearchStateActions, totalUtilitySoFar, nextVisitedPositions, self.getFeatures(nextGameState))
-        queue.push((nextSearchState, totalUtilitySoFar))
+        # print type(searchState.actionsSoFar)
 
+        # print 'actionsSoFar:', searchState.actionsSoFar
+        # nextSearchStateActions = searchState.actionsSoFar
+        # nextSearchStateActions = [ a for a in searchState.actionsSoFar ]
+        nextSearchStateActions = list(searchState.actionsSoFar)
+        nextSearchStateActions.append(action)
+        nextVisitedPositions = list(searchState.visitedPositions)
+        nextVisitedPositions.append(nextPosition)
+
+        # print 'nextSearchStateActions:', nextSearchStateActions
+        nextSearchState = SearchState(nextGameState, agentIndex, nextSearchStateActions, totalUtilitySoFar, nextVisitedPositions, self.getFeatures(nextGameState))
+        
+        # print 'len before push:', len(queue.list)
+        queue.push((nextSearchState, totalUtilitySoFar))
+        # print 'len after push:', len(queue.list)
+
+        # depthCounter -= 1
         # time.sleep(1)
 
     print 'queue:', len(queue.list)
     bestActions = []
     maxUtility = -99999999999999999
+    # minUtility = 99999999999999999
     while not queue.isEmpty():
       s, u = queue.pop()
+      # if u < minUtility:
+      # print 'state:', str(s), ' utility:', u
       if u > maxUtility:
         maxUtility = u
         bestActions = s.actionsSoFar
     
     print 'bestActions:', bestActions, ' maxUtility:', maxUtility
+    # print '------------------------------'
     return bestActions, maxUtility
 
         # if nextPosition not in visitedPositions:
@@ -198,7 +221,7 @@ class ReflexAgent(CaptureAgent):
 
   def getUtility(self, gameState):
     features = self.getFeatures(gameState)
-    weights = self.getWeights(gameState)
+    weights = self.getWeights(gameState, features)
     return features * weights
 
 
@@ -206,39 +229,59 @@ class ReflexAgent(CaptureAgent):
     return gameState.getAgentPosition(agentIndex)
 
 
-  def getDistToHome(self, gameState):
-    current_position = gameState.getAgentPosition(self.index)
+  def getDistanceToHome(self, gameState):
+
+    currentPosition = gameState.getAgentPosition(self.index)
+    gridHalf = self.getFood(gameState).width
+
+    yBorderPos = [ (gridHalf, y) for y in range(self.getFood(gameState).height) if not gameState.hasWall(gridHalf, y) ]
+
+    return self.getMazeDistance(currentPosition, gridHalf)
 
 
   def getFeatures(self, gameState):
-    # print 'color:', gameState.getAgentState(agent)
-
-    # print 'offensive index:', self.index
-
     features = util.Counter()
 
     agentStateData = gameState.getAgentState(self.index)
     agentPosition = agentStateData.getPosition()
 
-    print 'agent', self.index, 'position:', agentPosition
-
     enemy_indices = self.getOpponents(gameState)
     foodList = self.getFood(gameState).asList()
 
-    features['distanceToGhost'] = min(self.getMazeDistance(agentPosition, gameState.getAgentPosition(enemy_index)) for enemy_index in enemy_indices if not gameState.getAgentState(enemy_index).isPacman)
+    enemyPacmen = [ enemyAgent for enemyAgent in enemy_indices if gameState.getAgentState(enemyAgent).isPacman ]
+    enemyGhosts = [ enemyAgent for enemyAgent in enemy_indices if not gameState.getAgentState(enemyAgent).isPacman ]
+
+    # features['distanceToEnemyPacman'] = min([ self.getMazeDistance(agentPosition, gameState.getAgentPosition(enemy_index)) for enemy_index in enemy_indices if gameState.getAgentState(enemy_index).isPacman ])
+    # features['distanceToGhost'] = min([ self.getMazeDistance(agentPosition, gameState.getAgentPosition(enemy_index)) for enemy_index in enemy_indices if not gameState.getAgentState(enemy_index).isPacman ])
+    
+    features['distanceToEnemyPacman'] = min(enemyPacmen) if len(enemyPacmen) else 99999999
+    features['distanceToGhost'] = min(enemyGhosts) if len(enemyGhosts) else 99999999
+    
     features['numFoodLeft'] = len(gameState.getRedFood().asList() if self.red else gameState.getBlueFood().asList())
     features['distanceToNearestFood'] = min( [self.getMazeDistance(agentPosition, food) for food in foodList] )
+    
     features['numCapsulesLeft'] = len(gameState.getRedCapsules() if self.red else gameState.getBlueCapsules())
 
-    # time.sleep(5)
-    # print agent, 'getting features:', features
+    features['score'] = self.getScore(gameState)
+    
+    features['distanceToHome'] = self.getDistanceToHome(gameState)
 
-    print 'offensive features:', features
+    print 'distance to home:', features['distanceToHome']
+
+    time.sleep(10)
+
     return features
 
 
-  def getWeights(self, gameState):
+  def getWeights(self, gameState, features):
+
+    enemy_indices = self.getOpponents(gameState)
+
+    enemyPacmen = [ enemyAgent for enemyAgent in enemy_indices if gameState.getAgentState(enemyAgent).isPacman ]
+    enemyGhosts = [ enemyAgent for enemyAgent in enemy_indices if not gameState.getAgentState(enemyAgent).isPacman ]
+
     weights = util.Counter({
+      'distanceToEnemyPacman' : -400,
       'distanceToGhost' : 30,
       'numFoodLeft' : -15,
       'distanceToNearestFood' : -1000,
@@ -246,19 +289,24 @@ class ReflexAgent(CaptureAgent):
     })
 
     if not gameState.getAgentState(self.index).isPacman:
+      # print 'not pacman'
       weights['distanceToGhost'] = 0
+      weights['distanceToEnemyPacman'] = -1000
+    else:
+      # agent is pacman
+      weights['distancetoGhost'] = 50
+      weights['distanceToEnemyPacman'] = 0
+
 
     return weights
 
 
-
-  # TODO: implement evaluation function
-  def evaluation(self, gameState, agent):
-    # print 'evaluating...'
-    features = self.getFeatures(gameState, agent)
-    weights = self.getWeights(gameState, agent)
-    evaluation = weights * features
-    print 'evaluation of agent', agent, ':', evaluation
-    return evaluation
+  # def evaluation(self, gameState, agent):
+  #   # print 'evaluating...'
+  #   features = self.getFeatures(gameState, agent)
+  #   weights = self.getWeights(gameState, agent)
+  #   evaluation = weights * features
+  #   print 'evaluation of agent', agent, ':', evaluation
+  #   return evaluation
 
 

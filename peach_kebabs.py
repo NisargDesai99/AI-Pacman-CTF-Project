@@ -111,6 +111,12 @@ class ReflexAgent(CaptureAgent):
     """
 
     actionsList, utility = self.findAction(gameState, self.index)
+    # print 'chosenAction:', actionsList[0], 'utlity:', utility
+    # if actionsList[0] == Directions.SOUTH and utility > 3300 and utility < 3700:
+    #   time.sleep(10)
+    # if actionsList[0] == Directions.NORTH and utility > 6000 and utility < 7100:
+    #   time.sleep(10)
+    # time.sleep(1)
     return actionsList[0]
     
     # nextGameState = gameState.generateSuccessor(self.index, action)
@@ -122,7 +128,7 @@ class ReflexAgent(CaptureAgent):
     # currentWeight = self.getWeights(currentFeatures, gameState)
     # nextWeight = self.getWeights(nextFeatures, nextGameState)
 
-    return successors[max_key]
+    # return successors[max_key]
 
 
   def findAction(self, gameState, agentIndex):
@@ -141,13 +147,25 @@ class ReflexAgent(CaptureAgent):
     queue.push((startState, 0))
 
     nextActions = gameState.getLegalActions(self.index)
+    actionsWithDistToHome = {}
+
+    if Directions.STOP in nextActions:
+      nextActions.remove(Directions.STOP)
+
+    currMinAction = None
+    currMinDist = 789798570918342
+
+    currMinKillAction = None
+    currMinKillDist = 7849332789473298
 
     # if there's food really close by, get it before anything else
     for action in nextActions:
       nextGameState = gameState.generateSuccessor(self.index, action)
       nextPosition = self.getPosition(nextGameState, self.index)
       nextFeatures = self.getFeatures(nextGameState)
-      
+
+      currentAgentState = gameState.getAgentState(self.index)
+
       # print 'nextPosition:', nextPosition, ' with action:', action
       
       # print 'nextActions:', nextActions
@@ -156,15 +174,45 @@ class ReflexAgent(CaptureAgent):
       # if nextPosition == (21,11) or nextPosition == (21,12):
       #   time.sleep(10)
 
-      if self.getFood(gameState)[nextPosition[0]][nextPosition[1]] and gameState.getAgentState(self.index).isPacman:
-        print 'getting food'
-        # time.sleep(10)
+      # closestPacmenDistances = self.getDistanceToEnemyPacmen(gameState)
+      # minDistPacman = min(closestPacmenDistances.iteritems(), key=operator.itemgetter(1))
+      enemyPositions = [ gameState.getAgentPosition(enemyAgent) for enemyAgent in self.getOpponents(gameState) ]
+      if nextPosition in enemyPositions:
         return [action], 10
-      else:
-        print 'nextPosition:', nextPosition
-        print self.getFood(gameState)[nextPosition[0]][nextPosition[1]]
-        # time.sleep(10)
 
+      closestGhostDistances = self.getDistanceToEnemyGhosts(gameState)
+      minGhostDistance = min(closestGhostDistances.iteritems(), key=operator.itemgetter(1))[1]
+
+      capsulePositions = self.getCapsules(gameState)
+      print 'capsule positions:', capsulePositions
+      if currentAgentState.isPacman and (nextPosition in capsulePositions) and minGhostDistance < 5:
+        print 'getting capsule'
+        return [action], 10
+
+      if minGhostDistance > 3 and self.getFood(gameState)[nextPosition[0]][nextPosition[1]] and currentAgentState.isPacman and currentAgentState.scaredTimer == 0:
+        # print 'getting food'
+        # time.sleep(3)
+        return [action], 10
+
+      ghostDistancesNextGameState = self.getDistanceToEnemyGhosts(nextGameState)
+      nextMinGhostDistance = min(ghostDistancesNextGameState.iteritems(), key=operator.itemgetter(1))[1]
+
+      if self.isPositionInHome(gameState, nextPosition) and currentAgentState.isPacman and nextMinGhostDistance < 5 and self.getDistanceToHome(gameState) <= 1 and currentAgentState.numCarrying > 0:
+        # print 'distance to home:', self.getDistanceToHome(gameState)
+        # print 'trying to return home with action:', action
+        # time.sleep(3)
+        return [action], 10
+
+      distToHome = self.getDistanceToHome(gameState)
+      if distToHome < currMinDist:
+        currMinDist = distToHome
+        currMinAction = action
+      
+      pacmanDistances = self.getDistanceToEnemyPacmen(gameState)
+      nextMinPacmanDistance = min( pacmanDistances.iteritems(), key=operator.itemgetter(1) )[1]
+      if nextMinPacmanDistance < currMinKillDist:
+        currMinKillDist = nextMinPacmanDistance
+        currMinKillAction = action
 
       # currentPosition = self.getPosition(gameState, self.index)
       # nearbyPositions = []
@@ -190,12 +238,28 @@ class ReflexAgent(CaptureAgent):
 
       # if self.getMazeDistance(nextPosition, food)
 
+    ghostDistancesThisGameState = self.getDistanceToEnemyGhosts(gameState)
+    minGhostDistance = min(ghostDistancesThisGameState.iteritems(), key=operator.itemgetter(1))[1]
 
-    print '------------------------------'
+    if currMinDist < 3 and gameState.getAgentState(self.index).isPacman and minGhostDistance > 5 and minGhostDistance < 10 and gameState.getAgentState(self.index).numCarrying > 0:
+      # time.sleep(5)
+      return [currMinAction], 10
+
+    if currMinKillDist < 4 and not gameState.getAgentState(self.index).isPacman:
+      return [currMinKillAction], 10
+
+    # minDist
+    # if currentAgentState.isPacman and min(actionsWithDistToHome.iteritems(), key=operator.itemgetter(1))[1] < 5 currentAgentState.numCarrying > 0:
+    #     print 'distance to home:', self.getDistanceToHome(gameState)
+    #     print 'trying to return home with action:', action
+    #     time.sleep(3)
+    #     return [action], 10
+
+    # print '------------------------------'
 
     depthCounter = 100
-    # while depthCounter >= 0 and not queue.isEmpty() and time.time() - startTime < 0.8:
-    while not queue.isEmpty() and time.time() - startTime < 0.8:
+    while depthCounter >= 0 and not queue.isEmpty() and time.time() - startTime < 0.8:
+    # while not queue.isEmpty() and time.time() - startTime < 0.8:
       (searchState, utility) = queue.pop()
       nextActions = searchState.currentGameState.getLegalActions(self.index)
       if Directions.STOP in nextActions:
@@ -216,7 +280,7 @@ class ReflexAgent(CaptureAgent):
         # if nextPosition in searchState.visitedPositions and exploredActionTree:
           continue
 
-        # if nextFeatures['distanceToGhost'] <= len(nextActions) and len(nextActions) < 5 and nextGameState.getAgentState(self.index).isPacman:
+        # if nextFeatures['distanceToEnemyGhost'] <= len(nextActions) and len(nextActions) < 5 and nextGameState.getAgentState(self.index).isPacman:
         #   continue
 
         if nextGameState not in visited:
@@ -253,7 +317,9 @@ class ReflexAgent(CaptureAgent):
         bestActions = s.actionsSoFar
     
     # print 'bestActions:', bestActions, ' maxUtility:', maxUtility
+    # time.sleep(2)
     # print '------------------------------'
+    # print 'depthCounter:', depthCounter
     return bestActions, maxUtility
 
         # if nextPosition not in visitedPositions:
@@ -261,10 +327,12 @@ class ReflexAgent(CaptureAgent):
         #   tempVisitedPositions.append(nextPosition)
 
 
-  def getUtility(self, gameState):
-    features = self.getFeatures(gameState)
-    weights = self.getWeights(gameState, features)
-    return features * weights
+  def isPositionInHome(self, gameState, position):
+    gridHalf = gameState.getWalls().width / 2
+    if self.red:
+      return position[0] < gridHalf
+    else:
+      return position[0] > gridHalf
 
 
   def isLegalPosition(self, position, gameState):
@@ -286,13 +354,19 @@ class ReflexAgent(CaptureAgent):
 
   def getDistanceToHome(self, gameState):
 
+    agentState = gameState.getAgentState(self.index)
+    if not agentState.isPacman:
+      return 0
+    
     currentPosition = gameState.getAgentPosition(self.index)
-    gridHalf = self.getFood(gameState).width
+    gridHalf = self.getFood(gameState).width / 2
+
+    if (currentPosition[0] < gridHalf and self.red) or (currentPosition[0] > gridHalf and not self.red):
+      return 0
 
     # yBorderPos = [ (gridHalf, y) for y in range(self.getFood(gameState).height) if not gameState.hasWall(gridHalf, y) ]
-    yBorderPos = [ (gridHalf, y) for y in range(gameState.getWalls().height) if not gameState.hasWall(gridHalf-1, y) ]
-
-    distances = [ self.getMazeDistance(currentPosition, (gridHalf, y)) for y in yBorderPos ]
+    yBorderPos = [ (gridHalf, y) for y in range(gameState.getWalls().height) if not gameState.hasWall(gridHalf, y) ]
+    distances = [ self.getMazeDistance(currentPosition, position) for position in yBorderPos ]
 
     return min(distances) if distances else 0
 
@@ -305,6 +379,7 @@ class ReflexAgent(CaptureAgent):
 
     return distances
 
+
   def getDistanceToEnemyGhosts(self, gameState):
     enemyAgents = self.getOpponents(gameState)
 
@@ -316,6 +391,50 @@ class ReflexAgent(CaptureAgent):
 
   def getNumCapturedFood(self, gameState):
     return gameState.getAgentState(self.index).numCarrying
+
+
+  def getUtility(self, gameState):
+    features = self.getFeatures(gameState)
+    weights = self.getWeights(gameState, features)
+
+
+    # # minimize
+    # 'distanceToNearestFood' : 7,
+    # 'numFoodLeft' : 2,
+    # 'capturedFood' : 5,
+    # 'distanceToEnemyPacman' : 0,
+    # 'numCapsulesLeft' : 1,
+    # 'distanceToHome' : 0,     # in certain cases
+
+    # # maximize
+    # 'distanceToEnemyGhost' : 0,
+    # 'distanceToAlly' : 0,
+
+
+    currentUtility = 0.0
+    for feature, value in features.items():
+
+      # there are certain features that should be minimized
+      # so we get an inverse of those features
+      if feature == 'distanceToNearestFood' and value != 0:
+        currentUtility += float(weights[feature]) / value
+      # elif feature == 'numFoodLeft' and value != 0:
+      #   currentUtility += float(weights[feature]) / value
+      elif feature == 'distanceToEnemyPacman' and value != 0:
+        currentUtility += float(weights[feature]) / value
+      elif feature == 'numEnemyPacmen' and value != 0:
+        currentUtility += float(weights[feature]) / value
+      elif feature == 'distanceToHome' and value != 0:
+        currentUtility += float(weights[feature]) / value
+      elif feature == 'distanceToNearestCapsule' and value != 0:
+        currentUtility += float(weights[feature]) / value
+      else:
+        currentUtility += weights[feature] * value
+
+    # print 'utility:', currentUtility, ' self.index:', self.index, ' isPacman:', gameState.getAgentState(self.index).isPacman
+    # print 'features:', features
+    # print 'weights:', weights
+    return currentUtility
 
 
   def getFeatures(self, gameState):
@@ -331,24 +450,32 @@ class ReflexAgent(CaptureAgent):
     enemyGhosts = [ enemyAgent for enemyAgent in enemy_indices if not gameState.getAgentState(enemyAgent).isPacman ]
 
     # features['distanceToEnemyPacman'] = min([ self.getMazeDistance(agentPosition, gameState.getAgentPosition(enemy_index)) for enemy_index in enemy_indices if gameState.getAgentState(enemy_index).isPacman ])
-    # features['distanceToGhost'] = min([ self.getMazeDistance(agentPosition, gameState.getAgentPosition(enemy_index)) for enemy_index in enemy_indices if not gameState.getAgentState(enemy_index).isPacman ])
+    # features['distanceToEnemyGhost'] = min([ self.getMazeDistance(agentPosition, gameState.getAgentPosition(enemy_index)) for enemy_index in enemy_indices if not gameState.getAgentState(enemy_index).isPacman ])
     
-    features['distanceToEnemyPacman'] = min(enemyPacmen) if len(enemyPacmen) else 99999999
-    features['distanceToGhost'] = min(enemyGhosts) if len(enemyGhosts) else 99999999
+    features['distanceToEnemyPacman'] = min(self.getDistanceToEnemyPacmen(gameState).iteritems(), key=operator.itemgetter(1))[1] if len(enemyPacmen) else 99999999
+    features['distanceToEnemyGhost'] = min(self.getDistanceToEnemyGhosts(gameState).iteritems(), key=operator.itemgetter(1))[1] if len(enemyGhosts) else 99999999
     
-    features['numFoodLeft'] = len(gameState.getRedFood().asList() if self.red else gameState.getBlueFood().asList())
+    # features['numFoodLeft'] = len(gameState.getRedFood().asList() if self.red else gameState.getBlueFood().asList())
     features['distanceToNearestFood'] = min( [self.getMazeDistance(agentPosition, food) for food in foodList] )
     
     features['numCapsulesLeft'] = len(gameState.getRedCapsules() if self.red else gameState.getBlueCapsules())
 
     features['capturedFood'] = self.getNumCapturedFood(gameState)
 
-    # features['score'] = self.getScore(gameState)
+    features['score'] = self.getScore(gameState)
     
+    allyIndex = [ agent for agent in self.getTeam(gameState) if agent != self.index ][0]
+    features['distanceToAlly'] = self.getMazeDistance(agentPosition, gameState.getAgentPosition(allyIndex))
     features['distanceToHome'] = self.getDistanceToHome(gameState)
 
-    # print 'distance to home:', features['distanceToHome']
+    features['defend'] = 5
 
+    features['numEnemyPacmen'] = len(enemyPacmen)
+
+    capsuleDistances = [ self.getMazeDistance(agentPosition, capsulePosition) for capsulePosition in self.getCapsules(gameState) ]
+    features['distanceToNearestCapsule'] = min(capsuleDistances) if len(capsuleDistances) else 0
+
+    # print 'distance to home:', features['distanceToHome']
     # time.sleep(10)
 
     return features
@@ -356,40 +483,153 @@ class ReflexAgent(CaptureAgent):
 
   def getWeights(self, gameState, features):
 
+    # TODO: add weights for captured food to prevent suicides to get home to defend
+
+    weights = util.Counter({
+
+      # minimize
+      'distanceToNearestFood' : 7,
+      # 'numFoodLeft' : 2,
+      'capturedFood' : 0,
+      'distanceToEnemyPacman' : 0,
+      'numCapsulesLeft' : 1,
+      'distanceToHome' : 0,     # in certain cases
+      'numEnemyPacmen' : 10,
+      'distanceToNearestCapsule' : 0,
+
+      # maximize
+      'distanceToEnemyGhost' : 0,
+      'score' : 10,
+      'distanceToAlly' : 0,
+
+
+      # misc
+      'defend' : 10
+    })
+
+    # TODO: if my ghosts have a scared timer -> prioritize capturing food over going for enemy pacman
+
     enemy_indices = self.getOpponents(gameState)
 
     enemyPacmen = [ enemyAgent for enemyAgent in enemy_indices if gameState.getAgentState(enemyAgent).isPacman ]
     enemyGhosts = [ enemyAgent for enemyAgent in enemy_indices if not gameState.getAgentState(enemyAgent).isPacman ]
+    
+    currentAgentState = gameState.getAgentState(self.index)
 
-    weights = util.Counter({
-      'distanceToEnemyPacman' : -4,
-      'distanceToGhost' : 3,
-      'numFoodLeft' : -1,
-      'distanceToNearestFood' : -10,
-      'numCapsulesLeft' : -1,
-      'distanceToHome': 0
-    })
+    # if gameState.getAgentState(self.index).isPacman:
+    #   if features['capturedFood'] > 1:
+    #     weights['distanceToHome'] = -10
+    #   elif features['capturedFood'] > 3:
+    #     weights['distanceToHome'] = -100
+    #   elif features['capturedFood'] > 6:
+    #     weights['distanceToHome'] = -200
+    # else:
+    #   weights['distanceToHome'] = 0
 
-    if gameState.getAgentState(self.index).isPacman:
-      if features['capturedFood'] > 1:
-        weights['distanceToHome'] = -10
-      elif features['capturedFood'] > 3:
-        weights['distanceToHome'] = -100
-      elif features['capturedFood'] > 6:
-        weights['distanceToHome'] = -200
-    else:
-      weights['distanceToHome'] = 0
+    # may be more than one pacmen trying to capture food, get pacman with max food
+    pacmanWithMostFood = None
+    if len(enemyPacmen):
+      foodHeldByPacmen = { enemyAgent : gameState.getAgentState(enemyAgent).numCarrying for enemyAgent in enemyPacmen }
+      pacmanWithMostFood = max(foodHeldByPacmen.iteritems(), key=operator.itemgetter(1))
 
-    if not gameState.getAgentState(self.index).isPacman:
-      # print 'not pacman'
-      weights['distanceToGhost'] = 0
-      weights['distanceToEnemyPacman'] = -10
-    else:
-      # agent is pacman
-      weights['distancetoGhost'] = 20
-      weights['distanceToEnemyPacman'] = 0
+    distToEnemyGhosts = self.getDistanceToEnemyGhosts(gameState)
+    minDistToEnemyGhost = min(distToEnemyGhosts.iteritems(), key=operator.itemgetter(1))[1]
+    
+    # large bfs depth causes it to realize that eating capsule 
+    # and hitting a ghost increases distance to enemy ghost
+    scaredEnemyGhostTimers = {}
+    for enemyGhostAgent in enemyGhosts:
+      scaredTimer = gameState.getAgentState(enemyGhostAgent).scaredTimer
+      if scaredTimer > 0:
+        scaredEnemyGhostTimers[enemyGhostAgent] = scaredTimer
 
+    allyScaredTimers = {}
+    for allyAgent in self.getTeam(gameState):
+      scaredTimer = gameState.getAgentState(allyAgent).scaredTimer
+      if scaredTimer > 0:
+        allyScaredTimers[allyAgent] = scaredTimer
 
+    # if len(allyScaredTimers):
+      # print 'ally is scared:', allyScaredTimers
+      # time.sleep(1)
+
+    if not currentAgentState.isPacman and not len(allyScaredTimers):
+      if len(enemyPacmen):
+        # weights['numEnemyPacman'] += 100
+        weights['distanceToAlly'] = -3
+        weights['distanceToEnemyPacman'] += 200 + (pacmanWithMostFood[1] * 20 if pacmanWithMostFood else 0)
+        weights['distanceToNearestFood'] -= 5
+        weights['score'] = 0
+        weights['capturedFood'] = 0
+    else:   # agent is pacman
+      weights['distanceToNearestFood'] = 7
+      weights['capturedFood'] = 3
+      weights['distanceToEnemyGhost'] = 3
+      weights['distanceToAlly'] -= 10
+
+      if len(allyScaredTimers):
+        # print 'not pacman and is scared'
+        weights['distanceToNearestFood'] += sum([timer for timer in allyScaredTimers]) * 200
+        weights['capturedFood'] += 10
+        weights['distanceToEnemyGhost'] += 10
+        weights['distanceToEnemyPacman'] = -20
+
+      if len(enemyPacmen):
+        if currentAgentState.numCarrying > 0:
+          print 'there are ENEMY PACMEN and CARRYING > 0'
+        elif currentAgentState.numCarrying == 0:
+          print 'there are ENEMY PACMEN and CARRYING == 0'
+
+      if len(enemyPacmen) and currentAgentState.numCarrying > 0:
+        weights['distanceToNearestFood'] = 0
+        weights['distanceToHome'] += 30 + (pacmanWithMostFood[1] * 10 if pacmanWithMostFood else 0)
+        
+        isAllyOnHomeSide = len([ agent for agent in self.getTeam(gameState) if self.isPositionInHome(gameState, gameState.getAgentPosition(agent)) ])
+        weights['score'] += 20
+        weights['distanceToEnemyPacman'] += (pacmanWithMostFood[1] * 5 if pacmanWithMostFood else 0)
+
+      if len(enemyPacmen) and currentAgentState.numCarrying == 0:
+        weights['distanceToNearestFood'] += 500
+        weights['capturedFood'] += 20
+        weights['distanceToEnemyGhost'] += 60
+
+      if not len(enemyPacmen) and minDistToEnemyGhost > 5:
+        weights['distanceToNearestFood'] += 30 * minDistToEnemyGhost
+        weights['distanceToEnemyGhost'] += 8
+        weights['capturedFood'] += 10
+        weights['distanceToNearestCapsule'] += 15
+
+      if minDistToEnemyGhost < 5:
+        # TODO
+        weights['distanceToNearestCapsule'] += 15
+        weights['distanceToEnemyGhost'] += 10
+        # weights['capturedFood'] += 10
+        # weights['score'] += 50
+        weights['distanceToNearestFood'] = 0
+        weights['distanceToEnemyPacman'] += 5
+        weights['distanceToHome'] += 10
+      
+      # if features['capturedFood'] > 0:
+      #   # weights['capturedFood'] += 20
+      #   weights['distanceToHome'] += features['capturedFood'] * 5
+      
+      if len(scaredEnemyGhostTimers):
+        # weights['distanceToAlly'] = -2
+        weights['distanceToNearestFood'] += 30
+        weights['distanceToEnemyGhost'] = 1 / weights['distanceToEnemyGhost']
+        weights['distanceToHome'] += 2
+
+      # if not gameState.getAgentState(self.index).isPacman:
+    #   # print 'not pacman'
+    #   weights['distanceToEnemyGhost'] = 0
+    #   weights['distanceToEnemyPacman'] = -10
+    # else:
+    #   # agent is pacman
+    #   weights['distanceToEnemyGhost'] = 20
+    #   weights['distanceToEnemyPacman'] = 0
+
+    # if len(allyScaredTimers):
+      # print 'weights:', weights
     return weights
 
 

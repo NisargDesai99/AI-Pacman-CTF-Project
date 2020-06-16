@@ -1,4 +1,8 @@
 *.pyc
 **/*.pyc
-
+*score*
+forfun.py
+kebab.py
+test*
+**/venv/*
 

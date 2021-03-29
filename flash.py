@@ -93,8 +93,31 @@ class FlashAgent(CaptureAgent):
 class OffensiveFlashAgent(FlashAgent):
     def findAction(self, gameState, agentIndex):
         print 'offensive flash agent call'
-        possibleActions = gameState.getLegalActions(self.index)
-        return [random.choice(possibleActions)], 10
+        actions = gameState.getLegalActions(self.index)
+
+        queue = util.Queue()
+        startState = SearchState(gameState, self.index, None, 0, visited, self.getFeatures(gameState))
+        queue.push(startState)
+
+        startTime = time.time()
+
+        if Directions.STOP in actions:
+            actions.remove(Directions.STOP)
+
+        # TODO: maybe if there's food nearby, pick it up before dong anything else
+
+        while not queue.isEmpty() and time.time() - startTime < 0.75:
+            currentSearchState = queue.pop()
+
+            for action in actions:
+                print 'considering action:', action
+                successorState = gameState.generateSuccessor(self.index, action)
+                nextFeatures = self.getFeatures(gameState)
+                nextWeights = self.getWeights(gameState)
+                utility = self.evaluate()
+                nextSearchState = SearchState(successorState, successorState.getAgentPosition
+
+        return [random.choice(actions)], 10
 
 
     def getFeatures(self, gameState):
@@ -124,28 +147,8 @@ class OffensiveFlashAgent(FlashAgent):
 class DefensiveFlashAgent(FlashAgent):
     def findAction(self, gameState, agentIndex):
         print 'defensive flash agent call'
-        actions = gameState.getLegalActions(self.index)
-
-        visited = {}
-        queue = util.Queue()
-        startState = SearchState(gameState, self.index, actions, 0, visited, self.getFeatures(gameState))
-        queue.push(startState)
-
-        startTime = time.time()
-
-        if Directions.STOP in actions:
-            actions.remove(Directions.STOP)
-
-        while not queue.isEmpty() and time.time() - startTime < 0.75:
-            currentSearchState = queue.pop()
-
-            for action in actions:
-                print 'considering action:', action
-
-
-
-
-        return [random.choice(actions)], 10
+        possibleActions = gameState.getLegalActions(self.index)
+        return [random.choice(possibleActions)], 10
 
 
     def getFeatures(self, gameState):
@@ -325,25 +328,22 @@ class ReflexAgent(CaptureAgent):
     depthCounter = 100
     # while depthCounter >= 0 and not queue.isEmpty() and time.time() - startTime < 0.8:
     while not queue.isEmpty() and time.time() - startTime < 0.8:
-      (searchState, utility) = queue.pop()
-      nextActions = searchState.currentGameState.getLegalActions(self.index)
-      if Directions.STOP in nextActions:
-        nextActions.remove(Directions.STOP)
+        (searchState, utility) = queue.pop()
+        nextActions = searchState.currentGameState.getLegalActions(self.index)
+        if Directions.STOP in nextActions:
+            nextActions.remove(Directions.STOP)
 
-      exploredActionTree = len(nextActions) == 1
+        exploredActionTree = len(nextActions) == 1
 
-      # FFFFFFFFFFFFFFFFFFFFTFTTFFFFFF
+        # FFFFFFFFFFFFFFFFFFFFTFTTFFFFFF
 
-      for action in nextActions:
-        nextGameState = searchState.currentGameState.generateSuccessor(searchState.agentIndex, action)
-        nextPosition = self.getPosition(nextGameState, self.index)
+        for action in nextActions:
+            nextGameState = searchState.currentGameState.generateSuccessor(searchState.agentIndex, action)
+            nextPosition = self.getPosition(nextGameState, self.index)
+            if nextPosition in searchState.visitedPositions:
+                continue
+
         nextFeatures = self.getFeatures(nextGameState)
-
-        # print 'nextPosition:', nextPosition, 'visited positions:', searchState.visitedPositions
-        # if nextPosition in searchState.visitedPositions and not exploredActionTree:
-        if nextPosition in searchState.visitedPositions:
-        # if nextPosition in searchState.visitedPositions and exploredActionTree:
-          continue
 
         # if nextFeatures['distanceToEnemyGhost'] <= len(nextActions) and len(nextActions) < 5 and nextGameState.getAgentState(self.index).isPacman:
         #   continue

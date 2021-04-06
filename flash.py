@@ -57,16 +57,16 @@ class MyAgentData:
 
 class SearchState:
 
-  def __init__(self, currentGameState, agentIndex, actionsSoFar, utilitySoFar, visitedPositions, currentFeatures):
+  def __init__(self, currentGameState, agentIndex, actions, utility, visitedPositions, currentFeatures):
     self.currentGameState = currentGameState
     self.agentIndex = agentIndex
-    self.actionsSoFar = actionsSoFar
-    self.utilitySoFar = utilitySoFar
+    self.actions = actions
+    self.utility = utility
     self.visitedPositions = visitedPositions
     self.currentFeatures = currentFeatures
 
   def __repr__(self):
-    return str(self.agentIndex) + ' ' + str(self.actionsSoFar) + ' ' + str(self.utilitySoFar)
+    return str(self.agentIndex) + ' ' + str(self.actions) + ' ' + str(self.utility)
 
 
 ##########
@@ -80,24 +80,26 @@ class FlashAgent(CaptureAgent):
 
 
     def chooseAction(self, gameState):
-        actionsList, utility = self.findAction(gameState, self.index)
+        actionsList, utility = self.findAction(gameState)
         print 'chosenAction:', actionsList[0], 'utlity:', utility
         return actionsList[0]
 
 
-    def findAction(gameState, agentIndex):
+    def findAction(self, gameState):
         print 'base flash agent findAction call'
         pass
 
 
 class OffensiveFlashAgent(FlashAgent):
-    def findAction(self, gameState, agentIndex):
+    def findAction(self, gameState):
         print 'offensive flash agent call'
         actions = gameState.getLegalActions(self.index)
 
+        visited = {}
+
         queue = util.Queue()
-        startState = SearchState(gameState, self.index, None, 0, visited, self.getFeatures(gameState))
-        queue.push(startState)
+        startSearchState = SearchState(gameState, gameState.getAgentPosition(self.index), [], 0, visited, self.getFeatures(gameState))
+        queue.push(startSearchState)
 
         startTime = time.time()
 
@@ -107,15 +109,36 @@ class OffensiveFlashAgent(FlashAgent):
         # TODO: maybe if there's food nearby, pick it up before dong anything else
 
         while not queue.isEmpty() and time.time() - startTime < 0.75:
-            currentSearchState = queue.pop()
+            for agentIdx in range(4):
+                currentSearchState = queue.pop()
+                print currentSearchState
+                # get utility for current agent's action set
+                #        *          - parent
+                #  *   *   *   *       - actions for current agent
+                # * * * * * * * *      - actions for next agent - enemy agent
+                #                           -> then next level is the second ally agent
+                #                           -> then final opponent agent
+                #                           -> then restart
+                #                   - for enemy agents
+                for action in actions:
+                    print 'considering action:', action
+                    successorState = gameState.generateSuccessor(agentIdx, action)
+                    nextFeatures = self.getFeatures(gameState)
+                    nextWeights = self.getWeights(gameState)
+                    utility = self.evaluate(features=nextFeatures, weights=nextWeights)
 
-            for action in actions:
-                print 'considering action:', action
-                successorState = gameState.generateSuccessor(self.index, action)
-                nextFeatures = self.getFeatures(gameState)
-                nextWeights = self.getWeights(gameState)
-                utility = self.evaluate()
-                nextSearchState = SearchState(successorState, successorState.getAgentPosition
+                    nextSearchState = SearchState(successorState, successorState.getAgentPosition(agentIdx), currentSearchState.actions.append(action), utility, visited, nextFeatures)
+                    queue.push(nextSearchState)
+
+                    # TODO: when does agent decide on action?
+                    """ Ex:
+                            * current agent sees 2 legal actions: North, East
+                            * iterates through both options, getting utility for itself without accounting for enemy
+                              move yet
+                            * next agent loop iteration:
+                                * enemy sees South, East options, iterates though them
+                                TODO?
+                    """
 
         return [random.choice(actions)], 10
 
@@ -145,7 +168,7 @@ class OffensiveFlashAgent(FlashAgent):
 
 
 class DefensiveFlashAgent(FlashAgent):
-    def findAction(self, gameState, agentIndex):
+    def findAction(self, gameState):
         print 'defensive flash agent call'
         possibleActions = gameState.getLegalActions(self.index)
         return [random.choice(possibleActions)], 10
